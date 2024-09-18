@@ -17,7 +17,7 @@ const cookieOptions = {
   httpOnly: true,
 };
 
-const register = async (req: Request, res: Response) => {
+const register = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { name, email, password } = req.body;
     const userExists = await User.findOne({ email });
@@ -28,7 +28,7 @@ const register = async (req: Request, res: Response) => {
     const userData = await User.create({
       name,
       email,
-      password: encryptPassword(password),
+      password: await encryptPassword(password),
     });
 
     return res.json({
@@ -39,7 +39,7 @@ const register = async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.json({
       status: 500,
-      message: error.messsge,
+      message: error,
     });
   }
 };

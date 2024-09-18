@@ -25,12 +25,14 @@ class RabbitMQService {
 
   private async listenForRequests() {
     this.channel.consume(this.requestQueue, async (msg) => {
+      console.log("Received message:", msg?.content.toString());
       if (msg && msg.content) {
         const { userId } = JSON.parse(msg.content.toString());
+        console.log(msg.content.toString());
         const userDetail = await getUserDetails(userId);
 
         this.channel.sendToQueue(
-          this.requestQueue,
+          this.responseQueue,
           Buffer.from(JSON.stringify(userDetail)),
           { correlationId: msg.properties.correlationId }
         );
@@ -43,6 +45,7 @@ class RabbitMQService {
 
 const getUserDetails = async (userId: string) => {
   const userDetails = await User.findById(userId).select("-password");
+  console.log("userDetails", userDetails);
   if (!userDetails) {
     throw new ApiError(404, "User not found");
   }
