@@ -13,31 +13,35 @@ class RabbitMQService {
   }
 
   async init() {
-    const connection = await amqp.connect(config.msgBrokerURL!);
-    this.channel = await connection.createChannel();
-    await this.channel.assertQueue(this.requestQueue);
-    await this.channel.assertQueue(this.responseQueue);
+    try {
+      const connection = await amqp.connect(config.msgBrokerURL!);
+      this.channel = await connection.createChannel();
 
-    this.channel.consume(
-      this.responseQueue,
-      (msg) => {
-        if (msg) {
-          const correlationId = msg.properties.correlationId;
-          const user = JSON.parse(msg.content.toString());
+      await this.channel.assertQueue(this.requestQueue);
+      await this.channel.assertQueue(this.responseQueue);
 
-          const callback = this.correlationMap.get(correlationId);
-          if (callback) {
-            callback(user);
-            this.correlationMap.delete(correlationId);
+      this.channel.consume(
+        this.responseQueue,
+        (msg) => {
+          if (msg) {
+            const correlationId = msg.properties.correlationId;
+            const user = JSON.parse(msg.content.toString());
+
+            const callback = this.correlationMap.get(correlationId);
+            if (callback) {
+              callback(user);
+              this.correlationMap.delete(correlationId);
+            }
           }
+        },
+        {
+          noAck: false,
         }
-      },
-      {
-        noAck: true,
-      }
-    );
+      );
+    } catch (error) {
+      console.error("RabbitMQ init error", error);
+    }
   }
-
   async requestUserDetails(userId: string, callback: Function) {
     const correlationId = uuidv4();
     this.correlationMap.set(correlationId, callback);
@@ -47,6 +51,7 @@ class RabbitMQService {
       { correlationId }
     );
   }
+
   async notifyReceiver(
     receiverId: string,
     messageContent: string,
@@ -54,6 +59,7 @@ class RabbitMQService {
     senderName: string
   ) {
     await this.requestUserDetails(receiverId, async (user: any) => {
+      console.log("user", user);
       const notificationPayload = {
         type: "MESSAGE_RECEIVED",
         userId: receiverId,
@@ -63,8 +69,12 @@ class RabbitMQService {
         fromName: senderName,
       };
 
+      console.log("notificationPayload", notificationPayload);
+
       try {
-        await this.channel.assertQueue(config.queue.notifications);
+        await this.channel.assertQueue(config.queue.notifications, {
+          durable: true,
+        });
         this.channel.sendToQueue(
           config.queue.notifications,
           Buffer.from(JSON.stringify(notificationPayload))

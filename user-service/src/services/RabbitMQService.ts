@@ -14,30 +14,37 @@ class RabbitMQService {
   }
 
   async init() {
-    this.connection = await amqp.connect(config.MESSAGE_BROKER_URL!);
-    this.channel = await this.connection.createChannel();
+    try {
+      this.connection = await amqp.connect(config.MESSAGE_BROKER_URL!);
+      this.channel = await this.connection.createChannel();
 
-    await this.channel.assertQueue(this.requestQueue);
-    await this.channel.assertQueue(this.responseQueue);
+      await this.channel.assertQueue(this.requestQueue);
+      await this.channel.assertQueue(this.responseQueue);
 
-    this.listenForRequests();
+      this.listenForRequests();
+    } catch (error) {
+      console.error("RabbitMQ init error", error);
+    }
   }
 
   private async listenForRequests() {
     this.channel.consume(this.requestQueue, async (msg) => {
       console.log("Received message:", msg?.content.toString());
       if (msg && msg.content) {
-        const { userId } = JSON.parse(msg.content.toString());
-        console.log(msg.content.toString());
-        const userDetail = await getUserDetails(userId);
+        try {
+          const { userId } = JSON.parse(msg.content.toString());
+          const userDetail = await getUserDetails(userId);
 
-        this.channel.sendToQueue(
-          this.responseQueue,
-          Buffer.from(JSON.stringify(userDetail)),
-          { correlationId: msg.properties.correlationId }
-        );
+          this.channel.sendToQueue(
+            this.responseQueue,
+            Buffer.from(JSON.stringify(userDetail)),
+            { correlationId: msg.properties.correlationId }
+          );
 
-        this.channel.ack(msg);
+          this.channel.ack(msg);
+        } catch (error) {
+          console.error("Error processing message", error);
+        }
       }
     });
   }

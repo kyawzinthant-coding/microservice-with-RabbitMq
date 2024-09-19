@@ -1,7 +1,6 @@
 import { Response } from "express";
 import { Message } from "../database";
 import { AuthRequest } from "../middleware";
-import mongoose from "mongoose";
 import { ApiError } from "../utils/apiError";
 import { handleMessageReceived } from "../utils";
 

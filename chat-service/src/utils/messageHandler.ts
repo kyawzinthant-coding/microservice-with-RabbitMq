@@ -11,6 +11,7 @@ export const handleMessageReceived = async (
     !UserStatusStore.getInstance().isUserOnline(receiverID);
 
   if (receiverIsOnline) {
+    console.log("sending");
     await rabbitMQService.notifyReceiver(
       receiverID,
       messageContent,
